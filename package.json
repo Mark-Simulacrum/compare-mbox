@@ -12,5 +12,6 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Mark-Simulacrum",
-  "license": "MIT"
+  "license": "MIT",
+  "bin": { "mbox-find-missing": "./find-missing.js" }
 }
