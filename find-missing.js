@@ -1,3 +1,5 @@
+#!/usr/bin/env babel-node
+
 import Mbox from "node-mbox";
 import flattenDeep from "lodash.flattendeep";
 
