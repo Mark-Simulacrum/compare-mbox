@@ -1,0 +1,16 @@
+{
+  "dependencies": {
+    "lodash.flattendeep": "^3.0.2",
+    "node-mbox": "^0.2.1"
+  },
+  "name": "compare-mbox",
+  "version": "1.0.0",
+  "description": "Diff for emails in mboxes",
+  "main": "find-missing.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Mark-Simulacrum",
+  "license": "MIT"
+}
