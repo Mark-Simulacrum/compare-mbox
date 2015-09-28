@@ -4,7 +4,7 @@
     "node-mbox": "^0.2.1"
   },
   "name": "compare-mbox",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Diff for emails in mboxes",
   "main": "find-missing.js",
   "devDependencies": {},
@@ -13,5 +13,7 @@
   },
   "author": "Mark-Simulacrum",
   "license": "MIT",
-  "bin": { "mbox-find-missing": "./find-missing.js" }
+  "bin": {
+    "mbox-find-missing": "./find-missing.js"
+  }
 }
