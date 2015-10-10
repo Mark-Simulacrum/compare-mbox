@@ -1,17 +1,20 @@
 #!/usr/bin/env babel-node
 
-import Mbox from "node-mbox";
-import flattenDeep from "lodash.flattendeep";
-
 import fs from "fs";
+import readline from "readline";
 import crypto from "crypto";
 
 function createReadStreamFromArgument(argument) {
+	let stream;
 	if (argument === "-") {
-		return process.stdin;
+		stream = process.stdin;
 	} else {
-		return fs.createReadStream(argument);
+		stream = fs.createReadStream(argument);
 	}
+
+	stream.setEncoding("binary");
+
+	return stream;
 }
 
 function hash(string) {
@@ -19,53 +22,66 @@ function hash(string) {
 	return hash.update(string).digest("hex");
 }
 
-const headerBodySplitter = /\n\r*\n/;
-function getHeaderAndBody(email) {
-	const bodyStart = email.search(headerBodySplitter);
+function processMbox(mboxPath, callback) {
+	const readStream = createReadStreamFromArgument(mboxPath);
 
-	return { headers: email.slice(0, bodyStart), body: email.slice(bodyStart) };
-}
-
-function getMboxHashes(argument) {
-	let mbox = new Mbox();
-
-	let hashes = [];
-
-	mbox.on("message", function(email) {
-		hashes.push(hash(getHeaderAndBody(email).body));
+	const reader = readline.createInterface({
+		input: readStream,
+		terminal: false,
+		historySize: 1
 	});
 
-	let result = new Promise(function (resolve) {
-		mbox.on("end", () => {
-			resolve(hashes);
-		});
-	});
+	readStream.on("end", () => reader.close());
 
-	createReadStreamFromArgument(argument).pipe(mbox);
+	let fromLine = "";
+	let sawBlankline = true;
+	let inProgressHeaders = "";
+	let inProgressBody = "";
+	let isReadingHeaders = true;
+	reader.on("line", line => {
+		if (line.indexOf("From ") === 0 && sawBlankline) {
+			// Process previous email
+			callback(mboxPath, fromLine, inProgressHeaders, inProgressBody);
 
-	return result;
-}
+			// Setup processing for this email
+			isReadingHeaders = true;
+			inProgressHeaders = "";
+			inProgressBody = "";
 
-function processPartEmails(argument, wholeHashes) {
-	let mbox = new Mbox();
-
-	mbox.on("message", email => {
-		let { headers, body } = getHeaderAndBody(email);
-		const bodyHash = hash(body);
-		if (!wholeHashes.some(wholeHash => bodyHash === wholeHash)) {
-			process.stdout.write(headers, "binary");
-
-			if (argument !== "-" && headers.indexOf("\nX-Was-Archived-At:") === -1) {
-				process.stdout.write("\nX-Was-Archived-At: " + argument, "binary");
+			fromLine = line;
+		} else if (isReadingHeaders) {
+			if (line.length === 0) {
+				isReadingHeaders = false;
+			} else {
+				inProgressHeaders += line + "\n";
 			}
-
-			process.stdout.write(body, "binary");
-			process.stdout.write("\n", "binary");
+		} else {
+			inProgressBody += line + "\n";
 		}
-	});
 
-	createReadStreamFromArgument(argument).pipe(mbox);
+		sawBlankline = line.length === 0;
+	});
 }
+
+let wholeHashes = [];
+function addToWholeHashes(mboxPath, fromLine, headers, body) {
+	wholeHashes.push(hash(body));
+}
+
+function isMissing(mboxPath, fromLine, headers, body) {
+	const bodyHash = hash(body);
+
+	if (!wholeHashes.some(hash => hash === bodyHash)) {
+		process.stdout.write(fromLine + "\n", "binary");
+		process.stdout.write(headers, "binary");
+		// if (mboxPath !== "-" && headers.indexOf("\nX-Was-Archived-At:") === -1) {
+		// 	process.stdout.write("X-Was-Archived-At: " + mboxPath + "\n", "binary");
+		// }
+		process.stdout.write("\n", "binary");
+		process.stdout.write(body, "binary");
+	}
+}
+
 
 function usage() {
 	process.stderr.write("Improper usage.\n");
@@ -83,13 +99,10 @@ let wholes = argv.slice(argv.indexOf(splitOnArg) + 1);
 
 if (parts.length === 0 || wholes.length === 0) usage();
 
-async function start() {
-	let wholeHashes = await * wholes.map(getMboxHashes);
-	wholeHashes = flattenDeep(wholeHashes);
-
-	for (let part of (parts: Array)) {
-		processPartEmails(part, wholeHashes);
-	}
+for (let wholeMbox of wholes) {
+	processMbox(wholeMbox, addToWholeHashes);
 }
 
-start();
+for (let partMbox of parts) {
+	processMbox(partMbox, isMissing);
+}
